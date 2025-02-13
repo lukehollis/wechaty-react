@@ -1,3 +1,7 @@
+
+![wechaty_react_example](https://github.com/user-attachments/assets/81665b10-28f0-4982-81cd-0f7f3e45457c)
+
+
 # Wechaty - React Client with @chatscope/chat-ui-kit-react
 
 A React-based chat interface for Wechaty, built using [@chatscope/chat-ui-kit-react](https://github.com/chatscope/chat-ui-kit-react) for the UI components so that you can connect to your wechaty backend from a web browser.  
