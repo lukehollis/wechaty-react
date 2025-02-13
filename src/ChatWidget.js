@@ -1,43 +1,81 @@
-import React from 'react';
-import { useChat, ChatMessage, MessageContentType, MessageDirection, MessageStatus } from "@chatscope/use-chat";
+import React, { useState, useEffect, useRef } from 'react';
 import {
   MainContainer,
   ChatContainer,
   MessageList,
   Message,
-  MessageGroup,
   MessageInput,
   ConversationHeader,
-  Avatar
+  Avatar,
+  MessageModel
 } from "@chatscope/chat-ui-kit-react";
 import "@chatscope/chat-ui-kit-styles/dist/default/styles.min.css";
 
 // Get configuration from window object or environment
 const config = {
-  websocketUrl: window.CHAT_CONFIG?.websocketUrl || 'ws://localhost:8000/ws/characters/',
+  websocketUrl: window.CHAT_CONFIG?.websocketUrl || 'ws://localhost:8788',
   avatarUrl: window.CHAT_CONFIG?.avatarUrl || '/account-outline.svg',
   userName: window.CHAT_CONFIG?.userName || 'User'
 };
 
-const ChatWidget = () => {
-  const { 
-    currentMessages, 
-    sendMessage,
-    activeConversation
-  } = useChat();
+function ChatWidget() {
+  const [messages, setMessages] = useState([]);
+  const ws = useRef(null);
 
-  const handleSend = (messageText) => {
-    sendMessage({
-      message: new ChatMessage({
-        content: messageText,
-        contentType: MessageContentType.TextHtml,
-        senderId: config.userName,
-        direction: MessageDirection.Outgoing,
-        status: MessageStatus.Sent
-      }),
-      conversationId: activeConversation?.id,
-      senderId: config.userName
-    });
+  useEffect(() => {
+    // Create WebSocket connection
+    ws.current = new WebSocket(config.websocketUrl);
+
+    ws.current.onopen = () => {
+      console.log('Connected to WebSocket server');
+    };
+
+    ws.current.onmessage = (event) => {
+      console.log('Received:', event.data);
+      const newMessage = {
+        message: event.data,
+        sentTime: "just now",
+        sender: "Bot",
+        direction: "incoming",
+        position: "single"
+      };
+      setMessages(prev => [...prev, newMessage]);
+    };
+
+    ws.current.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    ws.current.onclose = () => {
+      console.log('Disconnected from WebSocket server');
+    };
+
+    // Cleanup on unmount
+    return () => {
+      if (ws.current) {
+        ws.current.close();
+      }
+    };
+  }, []);
+
+  const sendMessage = (message) => {
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+      ws.current.send(message);
+      const newMessage = {
+        message: message,
+        sentTime: "just now",
+        sender: config.userName,
+        direction: "outgoing",
+        position: "single"
+      };
+      setMessages(prev => [...prev, newMessage]);
+    } else {
+      console.error('WebSocket is not connected');
+    }
+  };
+
+  const handleSend = (message) => {
+    sendMessage(message);
   };
 
   return (
@@ -45,27 +83,18 @@ const ChatWidget = () => {
       <MainContainer>
         <ChatContainer>
           <ConversationHeader>
-            <Avatar src={config.avatarUrl} name={config.userName} />
-            <ConversationHeader.Content userName={config.userName} />
+            <Avatar src={config.avatarUrl} name="Wechaty Bot" />
+            <ConversationHeader.Content userName="Wechaty Bot" info="Try sending 'ding'" />
           </ConversationHeader>
           <MessageList>
-            {currentMessages.map(group => (
-              <MessageGroup key={group.id} direction={group.direction}>
-                <MessageGroup.Messages>
-                  {group.messages.map(msg => (
-                    <Message 
-                      key={msg.id}
-                      model={{
-                        type: "text",
-                        payload: msg.content
-                      }}
-                    />
-                  ))}
-                </MessageGroup.Messages>
-              </MessageGroup>
+            {messages.map((msg, index) => (
+              <Message key={index} model={msg}>
+                <Message.Header sender={msg.sender} sentTime={msg.sentTime} />
+                <Avatar src={config.avatarUrl} name={msg.sender} />
+              </Message>
             ))}
           </MessageList>
-          <MessageInput onSend={handleSend} />
+          <MessageInput placeholder="Type 'ding' to test..." onSend={handleSend} />
         </ChatContainer>
       </MainContainer>
     </div>

@@ -1,59 +1,37 @@
-import { BasicStorage, ChatMessage, MessageContentType, MessageDirection, MessageStatus } from "@chatscope/use-chat";
-import { EventEmitter } from "events";
-
-export class WebSocketChatService extends EventEmitter {
-  constructor(storage, updateState, websocketUrl) {
-    super();
-    this.storage = storage;
-    this.updateState = updateState;
-    this.ws = new WebSocket(websocketUrl);
-    this.setupWebSocket();
+class WebSocketChatService {
+  constructor(url) {
+    this.url = url;
+    this.socket = null;
+    this.onMessageCallback = null;
   }
 
-  setupWebSocket() {
-    this.ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      // Convert incoming message to ChatMessage format and update state
-      this.updateState({
-        type: "message.add",
-        payload: {
-          message: new ChatMessage({
-            content: data.message,
-            contentType: MessageContentType.TextHtml,
-            senderId: data.sender,
-            direction: data.sender === window.CHAT_CONFIG?.userName ? MessageDirection.Outgoing : MessageDirection.Incoming,
-            status: MessageStatus.Sent
-          }),
-          conversationId: "default"
-        }
-      });
+  connect(onMessageCallback) {
+    this.onMessageCallback = onMessageCallback;
+    this.socket = new WebSocket(this.url);
+    this.socket.onopen = () => {
+      console.log('WebSocket connection established');
+    };
+    this.socket.onmessage = (event) => {
+      console.log('Received message:', event.data);
+      if (this.onMessageCallback) {
+        this.onMessageCallback(event.data);
+      }
+    };
+    this.socket.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+    this.socket.onclose = (event) => {
+      console.log('WebSocket closed:', event);
     };
   }
 
-  sendMessage(message, conversationId) {
-    this.ws.send(JSON.stringify({
-      type: 'chat_message',
-      message: message.content,
-      sender: message.senderId
-    }));
-
-    // Store the message
-    const newMessage = new ChatMessage({
-      content: message.content,
-      contentType: MessageContentType.TextHtml,
-      senderId: message.senderId,
-      direction: MessageDirection.Outgoing,
-      status: MessageStatus.Sent
-    });
-
-    this.updateState({
-      type: "message.add",
-      payload: {
-        message: newMessage,
-        conversationId: conversationId || "default"
-      }
-    });
-
-    return Promise.resolve(newMessage);
+  send(message) {
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(message);
+    } else {
+      console.error('WebSocket is not open. Unable to send message.');
+    }
   }
 }
+
+export { WebSocketChatService };
